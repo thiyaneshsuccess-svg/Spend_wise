@@ -48,10 +48,11 @@ index on `(user_id, <primary access path>)`.
 
 Design notes:
 
-- **`dedupe_key`** is a hash of `(account_id, posted_on, amount_minor, merchant_norm, occurrence_index)`.
-  `occurrence_index` disambiguates genuinely identical same-day rows (two coffees). Re-importing an
-  overlapping statement is a no-op instead of double-counting — the most common real-world failure of
-  hand-built expense apps.
+- **`dedupe_key`** is a hash of `(account_id, posted_on, amount_minor, merchant_norm, occurrence_index)`,
+  where `occurrence_index` is the row's position among identical rows *within the imported file*. Two
+  coffees on the same day both survive, while re-importing the same file is a no-op instead of
+  double-counting — the most common real-world failure of hand-built expense apps. Identical rows
+  arriving in *different* files collapse to one; a `force` override arrives with the import review UI.
 - **`evidence` / `params`** are the audit trail. Deleting a transaction invalidates insights that
   cite it via fingerprint change, so stale insights cannot survive a ledger edit.
 - **`is_transfer`** exists because moving money between your own accounts is not spending. Getting

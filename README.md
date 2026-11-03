@@ -63,18 +63,56 @@ and it expands inline to show every component that produced it.
 - **Categorisation is rules + memory, not an LLM guess.** Deterministic, explainable, cheap, and it
   improves through your own overrides.
 
+## Run it locally
+
+Prerequisites: **Python 3.12+** and **Node 20+**. No Docker, no database server.
+
+```bash
+# 1. Backend
+cd backend
+py -3 -m venv .venv                       # macOS/Linux: python3 -m venv .venv
+.venv/Scripts/python -m pip install -e ".[dev]"   # macOS/Linux: .venv/bin/python
+.venv/Scripts/python -m alembic upgrade head
+.venv/Scripts/python -m app.seed --months 18      # deterministic demo ledger
+.venv/Scripts/python -m uvicorn app.main:app --port 8000
+```
+
+```bash
+# 2. Frontend (second terminal)
+cd frontend
+npm install
+npm run dev        # http://localhost:5173, proxies /api to :8000
+```
+
+Or serve everything from one process: `npm run build`, then open <http://localhost:8000> — FastAPI
+serves the built SPA.
+
+```bash
+# Checks
+cd backend && .venv/Scripts/python -m pytest      # 69 tests, no database required
+cd backend && .venv/Scripts/python -m ruff check .
+cd frontend && npm run build                      # typecheck + production build
+```
+
+**What works today (M1):** CSV import with alias-based column detection and a dry-run preview,
+idempotent dedupe (import the same statement twice — nothing doubles), merchant normalisation,
+filterable ledger with reconciled totals, and a deterministic 18-month synthetic ledger.
+
+**Not yet:** categorisation of imported rows (they arrive as `unknown` by design — guessing is M2),
+recurring detection (M4), forecasting (M5), auth (M7).
+
 ## Stack
 
 | Layer | Choice | Why |
 | --- | --- | --- |
 | Analytics + API | Python 3.13, FastAPI, Pydantic v2 | Where the actual intellectual work lives; matches an AI/ML/data trajectory |
 | Persistence | SQLAlchemy 2.0 + Alembic, SQLite (dev/demo) → Postgres (prod) | Zero-setup local runs, no vendor lock, real migrations |
-| Numerics | NumPy (vectorised path simulation), SciPy where justified | 2,000 forecast paths in milliseconds, not seconds |
+| Numerics | NumPy (vectorised path simulation) | 2,000 forecast paths in milliseconds, not seconds |
 | UI | React 19 + TypeScript + Vite + Tailwind + TanStack Query | Server-state isolation, typed contracts, fast feedback loop |
-| Auth | Self-hosted opaque session cookies (argon2id) | Revocable, httpOnly, no tokens in JS, and it teaches the real thing |
+| Auth | Self-hosted opaque session cookies (argon2id) — M7 | Revocable, httpOnly, no tokens in JS |
 
-Frontend and backend are one repository, one container in production, and same-origin — so cookie
-auth needs no CORS gymnastics and no third-party identity vendor.
+One repository, one container in production, same-origin — so cookie auth needs no CORS gymnastics
+and no third-party identity vendor.
 
 ## Repository layout
 
@@ -82,17 +120,17 @@ auth needs no CORS gymnastics and no third-party identity vendor.
 backend/
   app/
     domain/        # entities, value objects, invariants — no I/O
-    analytics/     # pure engines: pulse, radar, horizon  (no DB, no HTTP)
-    services/      # orchestration: import, insights, forecasting
+    analytics/     # pure engines: pulse, radar, horizon (M3+)
+    services/      # orchestration: import, demo data, (insights, forecasting)
     api/           # FastAPI routers, schemas, dependencies
-    db/            # models, session, migrations glue
-  tests/           # unit (pure) + integration (API, in-memory SQLite)
-  scripts/         # demo data generator, CLI utilities
+    db/            # models, session, repositories
+  alembic/         # schema history, checked against models by `alembic check`
+  tests/           # pure unit tests + API integration tests
 frontend/
   src/
-    features/      # ledger, pulse, radar, horizon, lab
-    components/    # design system primitives
-    lib/           # typed API client, formatters
+    features/      # ledger, (pulse, radar, horizon, lab)
+    components/    # shell and design-system primitives
+    lib/           # typed API client
 docs/
   decisions/       # ADRs — the "why", kept current
   architecture.md
@@ -101,20 +139,16 @@ docs/
 
 ## Status
 
-Milestone 0 — product direction, architecture and repository foundation.
-
 | Milestone | Scope | State |
 | --- | --- | --- |
-| M0 | Vision, ADRs, repo foundation, CI | ← in progress |
-| M1 | Ledger: domain, import, demo generator | not started |
-| M2 | Categorisation engine + rules UI | not started |
+| M0 | Vision, ADRs, repo foundation | done |
+| M1 | Ledger: domain, import, dedupe, demo generator, UI | done |
+| M2 | Categorisation engine + rules UI | next |
 | M3 | Pulse: variance attribution | not started |
 | M4 | Radar: recurring + anomalies | not started |
 | M5 | Horizon: forecast + safe-to-spend | not started |
 | M6 | Lab: scenarios + constrained NL query | not started |
 | M7 | Auth, hardening, deploy, portfolio polish | not started |
-
-Run instructions land with M1. See [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Documents
 
@@ -140,5 +174,5 @@ Run instructions land with M1. See [`docs/roadmap.md`](docs/roadmap.md).
 
 - Demo data and default currency are **INR**, assuming an Indian context (salary cycles, UPI-era
   merchant names, annual insurance premiums). Currency is a user setting; formatting goes through
-  `Intl.NumberFormat`.
+  Indian digit grouping on the server.
 - Primary use is **individual** finances, one or more accounts, one currency per user.
