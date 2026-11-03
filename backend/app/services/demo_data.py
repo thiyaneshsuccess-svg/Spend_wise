@@ -146,12 +146,23 @@ def _ensure_taxonomy(session: Session, user: User) -> dict[str, dict[str, int]]:
     return {"categories": categories, "accounts": account_ids}
 
 
+def default_end(today: date | None = None) -> date:
+    """Demo data covers *complete* months.
+
+    Ending mid-month would open the app on a three-day stub of spending, which
+    reads as an empty ledger on the very first screen — the opposite of what a
+    demo dataset is for.
+    """
+    today = today or date.today()
+    return today.replace(day=1) - timedelta(days=1)
+
+
 def build_rows(
     *, months: int = 18, seed: int = 42, end: date | None = None
 ) -> list[tuple[date, int, str, str, str, str]]:
     """Generate (posted_on, amount_minor, raw, norm, category, account) rows."""
     rng = random.Random(seed)
-    end = end or date.today()
+    end = end or default_end()
     end_period = MonthPeriod.from_date(end)
     periods = [end_period.shift(-offset) for offset in range(months - 1, -1, -1)]
     rows: list[tuple[date, int, str, str, str, str]] = []

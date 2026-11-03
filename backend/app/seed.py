@@ -24,8 +24,12 @@ def main() -> None:
     parser.add_argument("--months", type=int, default=18)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--currency", default="INR")
-    parser.add_argument("--end", type=date.fromisoformat, default=None,
-                        help="Last day of generated data (YYYY-MM-DD), defaults to today")
+    parser.add_argument(
+        "--end",
+        type=date.fromisoformat,
+        default=None,
+        help="Last day of generated data (YYYY-MM-DD); defaults to the end of last month",
+    )
     args = parser.parse_args()
 
     if "transactions" not in inspect(engine).get_table_names():
