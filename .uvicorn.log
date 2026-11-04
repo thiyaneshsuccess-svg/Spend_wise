@@ -1,8 +1,13 @@
-INFO:     Started server process [24916]
+INFO:     Started server process [25080]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-INFO:     127.0.0.1:65006 - "GET /api/health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65043 - "GET /api/meta HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65044 - "GET /api/review HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65045 - "GET /api/breakdown?month=2026-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52410 - "GET /api/pulse?month=2026-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62272 - "GET /api/review HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62274 - "GET /api/transactions?month=2026-10&category_id=3&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62273 - "GET /api/meta HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54298 - "GET /api/breakdown HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54299 - "GET /api/meta HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54304 - "GET /api/breakdown?month=2026-10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54301 - "GET /api/transactions?limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54305 - "GET /api/transactions?month=2026-10&limit=50&offset=0 HTTP/1.1" 200 OK

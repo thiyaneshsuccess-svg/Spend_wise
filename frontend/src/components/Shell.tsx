@@ -1,22 +1,22 @@
 import type { ReactNode } from "react";
 
-/**
- * The application shell.
- *
- * The engine list is deliberately visible while only Ledger is live: it makes
- * the roadmap legible in the product itself instead of hiding in a README, and
- * it stops the UI from looking like a finished generic expense table.
- */
-
-const ENGINES: { name: string; question: string; stage: string | null }[] = [
-  { name: "Ledger", question: "What happened", stage: null },
-  { name: "Pulse", question: "What changed", stage: "M3" },
-  { name: "Radar", question: "Hidden costs", stage: "M4" },
-  { name: "Horizon", question: "What comes next", stage: "M5" },
-  { name: "Lab", question: "What if", stage: "M6" },
+const ENGINES: { name: string; key: string; question: string; stage: string | null }[] = [
+  { name: "Ledger", key: "ledger", question: "What happened", stage: null },
+  { name: "Pulse", key: "pulse", question: "What changed", stage: null },
+  { name: "Radar", key: "radar", question: "Hidden costs", stage: "M4" },
+  { name: "Horizon", key: "horizon", question: "What comes next", stage: "M5" },
+  { name: "Lab", key: "lab", question: "What if", stage: "M6" },
 ];
 
-export default function Shell({ children }: { children: ReactNode }) {
+export default function Shell({
+  children,
+  active = "ledger",
+  onNavigate,
+}: {
+  children: ReactNode;
+  active?: string;
+  onNavigate?: (key: string) => void;
+}) {
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[248px_1fr]">
       <aside className="border-b border-line bg-panel/60 px-4 py-4 lg:min-h-screen lg:border-r lg:border-b-0 lg:px-5 lg:py-6">
@@ -30,36 +30,41 @@ export default function Shell({ children }: { children: ReactNode }) {
 
         <nav aria-label="Engines" className="mt-6 flex gap-1 overflow-x-auto lg:flex-col">
           {ENGINES.map((engine) => {
-            const active = engine.stage === null;
+            const isActive = active === engine.key;
+            const clickable = engine.key === "ledger" || engine.key === "pulse";
             return (
-              <div
+              <button
                 key={engine.name}
-                aria-current={active ? "page" : undefined}
+                type="button"
+                onClick={() => clickable && onNavigate?.(engine.key)}
+                aria-current={isActive ? "page" : undefined}
                 className={[
-                  "flex shrink-0 items-baseline justify-between gap-3 rounded-lg px-3 py-2 text-sm lg:shrink",
-                  active ? "bg-panel-2 text-paper" : "text-mist/70",
+                  "flex w-full shrink-0 items-baseline justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm lg:shrink",
+                  isActive ? "bg-panel-2 text-paper" : clickable ? "text-mist hover:bg-panel-2/40 hover:text-paper" : "text-mist/50",
+                  !clickable ? "cursor-not-allowed" : "cursor-pointer",
                 ].join(" ")}
+                disabled={!clickable}
               >
                 <span className="flex items-baseline gap-2">
-                  <span className={active ? "font-medium" : ""}>{engine.name}</span>
+                  <span className={isActive ? "font-medium" : ""}>{engine.name}</span>
                   <span className="hidden text-[11px] text-mist/60 xl:inline">
                     {engine.question}
                   </span>
                 </span>
                 {engine.stage ? (
-                  <span className="chip border-line/70 text-[10px] uppercase tracking-wide">
+                  <span className="pill pill-muted text-[10px] uppercase tracking-wide">
                     {engine.stage}
                   </span>
-                ) : (
+                ) : isActive ? (
                   <span aria-hidden className="size-1.5 rounded-full bg-accent" />
-                )}
-              </div>
+                ) : null}
+              </button>
             );
           })}
         </nav>
 
         <div className="mt-6 hidden rounded-lg border border-line/70 p-3 text-[11px] leading-relaxed text-mist/70 lg:block">
-          Your transactions never leave this machine. Import a statement to begin.
+          Your transactions never leave this machine.
         </div>
       </aside>
 

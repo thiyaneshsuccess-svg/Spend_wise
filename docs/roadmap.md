@@ -27,7 +27,7 @@ inline category edit + propagation; category spend breakdown.
 merchant memory; rule precedence is covered by tests.
 **Learning:** precedence design, confidence as data, why "unknown" beats a wrong default; explainability over blind auto-categorisation.
 
-## M3 — Pulse
+## M3 — Pulse *(done)*
 Monthly aggregates, robust baselines (median), merchant-level variance attribution, reconciliation
 invariant test.
 **Done when:** the decomposition sums exactly to the period delta in property-style tests; the UI can

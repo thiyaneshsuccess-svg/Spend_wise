@@ -23,6 +23,9 @@ from app.api.schemas import (
     CategoriseRunOut,
     CategoryOut,
     CategorySpendOut,
+    PulseCategoryDeltaOut,
+    PulseMerchantDeltaOut,
+    PulseOut,
     HealthOut,
     ImportPreviewOut,
     ImportResultOut,
@@ -46,7 +49,7 @@ from app.db.models import Account, Category, CategoryRule, Transaction
 from app.domain.categorisation import MatchField, MatchType, Rule, RuleError, RuleOrigin
 from app.domain.money import format_minor
 from app.domain.period import MonthPeriod
-from app.services import categorisation_service, import_service, ledger_summary
+from app.services import categorisation_service, import_service, ledger_summary, pulse_service
 from app.services.demo_data import seed_demo_data
 
 router = APIRouter(prefix="/api")
@@ -226,6 +229,64 @@ def category_breakdown(
             )
             for item in slices
         ],
+    )
+
+
+@router.get("/pulse", response_model=PulseOut)
+def pulse(
+    session: SessionDep,
+    user: CurrentUser,
+    month: Annotated[str, Query(pattern=r"^\d{4}-\d{1,2}$")],
+    lookback: int = 6,
+    include_transfers: bool = False,
+) -> PulseOut:
+    try:
+        report = pulse_service.pulse(
+            session, user_id=user.id, month=month, lookback=lookback, include_transfers=include_transfers
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return PulseOut(
+        month=report.month,
+        baseline_months=report.baseline_months,
+        total_current_minor=report.total_current_minor,
+        total_current=format_minor(-report.total_current_minor, user.currency),
+        total_baseline_minor=report.total_baseline_minor,
+        total_baseline=format_minor(-report.total_baseline_minor, user.currency),
+        total_delta_minor=report.total_delta_minor,
+        total_delta=format_minor(-report.total_delta_minor, user.currency),
+        categories=[
+            PulseCategoryDeltaOut(
+                category_id=c.category_id,
+                category=c.category,
+                current_minor=c.current_minor,
+                current=format_minor(-c.current_minor, user.currency),
+                baseline_minor=c.baseline_minor,
+                baseline=format_minor(-c.baseline_minor, user.currency),
+                delta_minor=c.delta_minor,
+                delta=format_minor(-c.delta_minor, user.currency),
+                current_count=c.current_count,
+                baseline_count=c.baseline_count,
+                change_pct=c.change_pct,
+            )
+            for c in report.categories
+        ],
+        top_drivers=[
+            PulseMerchantDeltaOut(
+                merchant=d.merchant,
+                category=d.category,
+                category_id=d.category_id,
+                current_minor=d.current_minor,
+                current=format_minor(-d.current_minor, user.currency),
+                baseline_minor=d.baseline_minor,
+                baseline=format_minor(-d.baseline_minor, user.currency),
+                delta_minor=d.delta_minor,
+                delta=format_minor(-d.delta_minor, user.currency),
+            )
+            for d in report.top_drivers
+        ],
+        reconciles=report.reconciles,
     )
 
 

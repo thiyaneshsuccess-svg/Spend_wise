@@ -187,6 +187,46 @@ export interface Breakdown {
   slices: CategorySlice[];
 }
 
+export interface PulseCategoryDelta {
+  category_id: number | null;
+  category: string;
+  current_minor: number;
+  current: string;
+  baseline_minor: number;
+  baseline: string;
+  delta_minor: number;
+  delta: string;
+  current_count: number;
+  baseline_count: number;
+  change_pct: number | null;
+}
+
+export interface PulseMerchantDelta {
+  merchant: string;
+  category: string | null;
+  category_id: number | null;
+  current_minor: number;
+  current: string;
+  baseline_minor: number;
+  baseline: string;
+  delta_minor: number;
+  delta: string;
+}
+
+export interface Pulse {
+  month: string;
+  baseline_months: string[];
+  total_current_minor: number;
+  total_current: string;
+  total_baseline_minor: number;
+  total_baseline: string;
+  total_delta_minor: number;
+  total_delta: string;
+  categories: PulseCategoryDelta[];
+  top_drivers: PulseMerchantDelta[];
+  reconciles: boolean;
+}
+
 export interface TransactionQuery {
   month?: string;
   categoryId?: number;
@@ -243,6 +283,14 @@ export function getBreakdown(month: string | undefined, includeTransfers = false
   if (month) params.set("month", month);
   if (includeTransfers) params.set("include_transfers", "true");
   return request<Breakdown>(`/api/breakdown?${params.toString()}`);
+}
+
+export function getPulse(month: string, lookback = 6, includeTransfers = false): Promise<Pulse> {
+  const params = new URLSearchParams();
+  params.set("month", month);
+  params.set("lookback", String(lookback));
+  if (includeTransfers) params.set("include_transfers", "true");
+  return request<Pulse>(`/api/pulse?${params.toString()}`);
 }
 
 export function getRules(): Promise<Rule[]> {

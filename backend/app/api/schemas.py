@@ -237,6 +237,46 @@ class CategoriseRunOut(BaseModel):
     by_source: dict[str, int] = Field(default_factory=dict)
 
 
+class PulseCategoryDeltaOut(BaseModel):
+    category_id: int | None = None
+    category: str
+    current_minor: int
+    current: str
+    baseline_minor: int
+    baseline: str
+    delta_minor: int
+    delta: str
+    current_count: int
+    baseline_count: int
+    change_pct: float | None = None
+
+
+class PulseMerchantDeltaOut(BaseModel):
+    merchant: str
+    category: str | None = None
+    category_id: int | None = None
+    current_minor: int
+    current: str
+    baseline_minor: int
+    baseline: str
+    delta_minor: int
+    delta: str
+
+
+class PulseOut(BaseModel):
+    month: str
+    baseline_months: list[str]
+    total_current_minor: int
+    total_current: str
+    total_baseline_minor: int
+    total_baseline: str
+    total_delta_minor: int
+    total_delta: str
+    categories: list[PulseCategoryDeltaOut]
+    top_drivers: list[PulseMerchantDeltaOut]
+    reconciles: bool
+
+
 class HealthOut(BaseModel):
     status: str = "ok"
     service: str = "spendwise"
