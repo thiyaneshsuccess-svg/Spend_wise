@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 from app.db.base import Base
 from app.db.models import Transaction
 from app.db.session import make_engine
-from app.services.demo_data import build_rows, seed_demo_data
+from app.services.demo_data import UNKNOWN_TAIL, build_rows, seed_demo_data
 
 END = date(2026, 10, 31)
 
@@ -77,21 +77,29 @@ def test_seeding_is_idempotent_and_database_backed() -> None:
     assert count_after_first is not None and count_after_first > 0
 
 
-def test_categories_and_transfers_are_assigned() -> None:
+def test_demo_ledger_is_categorised_except_for_a_deliberate_unknown_tail() -> None:
+    """Demo data must exercise the review queue, not just the happy path."""
     engine: Engine = make_engine("sqlite://")
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
     with factory() as session:
         seed_demo_data(session, months=6, end=END)
-        uncategorised = session.scalar(
-            select(func.count(Transaction.id)).where(Transaction.category_id.is_(None))
-        )
+        unknown = session.scalars(
+            select(Transaction).where(Transaction.category_id.is_(None))
+        ).all()
         transfers = session.scalar(
             select(func.count(Transaction.id)).where(Transaction.is_transfer.is_(True))
         )
 
     engine.dispose()
 
-    assert uncategorised == 0
+    assert unknown, "the review queue would be empty in every demo"
+    assert len(unknown) <= 12
+    # Only the merchants intentionally left unknown; nothing else slipped through.
+    assert {row.merchant_norm for row in unknown} <= {
+        "BLUE TOKAI COFFEE",
+        *(name for name, _, _ in UNKNOWN_TAIL),
+    }
+    assert all(row.category_source == "unknown" for row in unknown)
     assert transfers and transfers > 0

@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 from app.db.models import ImportBatch, Transaction
 from app.domain.merchant import looks_like_transfer, normalise_merchant
 from app.domain.money import format_minor, parse_amount_minor
+from app.services import categorisation_service
 
 PARSER_VERSION = "1"
 MAX_ROWS = 20_000
@@ -323,7 +324,11 @@ def commit(
             )
         )
 
-    session.commit()
+    # Categorise on the way in rather than leaving rows anonymous: the ledger
+    # is only useful the moment the totals mean something. Anything the rules
+    # cannot explain stays explicitly ``unknown`` for the review queue.
+    session.flush()
+    categorisation_service.apply_pending(session, user_id=user_id)
     return ImportResult(
         batch_id=batch.id,
         total_rows=analysis.total_rows,

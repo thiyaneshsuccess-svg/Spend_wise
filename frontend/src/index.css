@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/*
+ * SpendWise design tokens.
+ *
+ * Structure follows the app-screen conventions of the taste-skill reference:
+ * a neutral ground, one quiet border tone, one accent spent on data and focus,
+ * an 8px card radius against a 6px control radius (never 11–12px), 32px
+ * controls, tabular figures everywhere money is printed, and KPI values in one
+ * divided strip rather than four floating tiles.
+ */
+
 @theme {
   --color-ink: #0a0d12;
   --color-panel: #11161f;
@@ -7,9 +17,11 @@
   --color-line: #222b39;
   --color-paper: #e9eef5;
   --color-mist: #8b96a8;
+  --color-faint: #6e7889;
   --color-accent: #c8f751;
   --color-pos: #6ee7a8;
   --color-neg: #ff8a7a;
+  --color-warn: #f2be5c;
 
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", "JetBrains Mono", Consolas, monospace;
@@ -24,14 +36,14 @@
     @apply bg-ink font-sans text-paper antialiased;
     background-image: radial-gradient(
       ellipse 80% 50% at 50% -20%,
-      color-mix(in oklab, var(--color-accent) 7%, transparent),
+      color-mix(in oklab, var(--color-accent) 6%, transparent),
       transparent
     );
     background-repeat: no-repeat;
   }
 
   ::selection {
-    @apply bg-accent/30 text-paper;
+    @apply bg-accent/25 text-paper;
   }
 
   :focus-visible {
@@ -40,27 +52,202 @@
 }
 
 @layer components {
-  .card {
-    @apply rounded-xl border border-line bg-panel;
+  /* ---------- surfaces ---------- */
+  .panel {
+    @apply rounded-lg border border-line bg-panel;
   }
 
+  .panel-head {
+    @apply flex flex-wrap items-center justify-between gap-3 border-b border-line/70 px-4 py-3;
+  }
+
+  .panel-title {
+    @apply text-sm font-semibold tracking-tight text-paper;
+  }
+
+  .panel-meta {
+    @apply text-xs text-faint;
+  }
+
+  /* ---------- controls ---------- */
   .btn {
-    @apply inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm text-paper transition-colors hover:border-mist/50 disabled:cursor-not-allowed disabled:opacity-40;
+    @apply inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-line bg-panel-2 px-3 text-[13px] font-medium text-paper transition-colors hover:border-mist/40 hover:bg-panel-2/70 disabled:cursor-not-allowed disabled:opacity-40;
   }
 
   .btn-primary {
-    @apply border-transparent bg-accent font-medium text-ink hover:bg-accent/85;
+    @apply border-transparent bg-accent text-ink hover:border-transparent hover:bg-accent/85;
+  }
+
+  .btn-ghost {
+    @apply border-transparent bg-transparent text-mist hover:border-transparent hover:bg-panel-2 hover:text-paper;
+  }
+
+  .btn-icon {
+    @apply size-8 shrink-0 px-0;
   }
 
   .input {
-    @apply rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm text-paper placeholder:text-mist/60 focus:border-accent/60 focus:outline-none;
+    @apply h-8 rounded-md border border-line bg-panel-2 px-2.5 text-[13px] text-paper placeholder:text-faint/80 focus:border-accent/60 focus:outline-none;
   }
 
-  .chip {
-    @apply inline-flex items-center rounded-md border border-line bg-panel-2 px-2 py-0.5 text-xs text-mist;
+  select.input {
+    @apply cursor-pointer pr-7;
+  }
+
+  .switch {
+    @apply relative h-5 w-8 shrink-0 cursor-pointer appearance-none rounded-full bg-line transition-colors;
+  }
+
+  .switch::after {
+    content: "";
+    @apply absolute top-0.5 left-0.5 size-4 rounded-full bg-mist transition-transform;
+  }
+
+  .switch:checked {
+    @apply bg-accent;
+  }
+
+  .switch:checked::after {
+    @apply translate-x-3 bg-ink;
+  }
+
+  .segmented {
+    @apply inline-flex w-max max-w-full gap-0.5 rounded-md border border-line bg-panel-2 p-0.5;
+  }
+
+  .segmented button {
+    @apply h-7 cursor-pointer rounded px-2.5 text-[12px] text-mist transition-colors hover:text-paper;
+  }
+
+  .segmented button[aria-pressed="true"] {
+    @apply bg-panel text-paper;
+  }
+
+  /* ---------- tabs: 2px rule under the selected label, ink not accent ---------- */
+  .tabs {
+    @apply flex gap-6 border-b border-line;
+  }
+
+  .tab {
+    @apply relative -mb-px inline-flex cursor-pointer items-center gap-2 border-b-2 border-transparent px-0.5 py-2.5 text-[13px] text-mist transition-colors hover:text-paper;
+  }
+
+  .tab[aria-selected="true"] {
+    @apply border-paper text-paper;
+  }
+
+  /* ---------- KPI strip: one panel, divided cells ---------- */
+  .kpi-strip {
+    @apply grid overflow-hidden rounded-lg border border-line bg-panel;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+  }
+
+  .kpi {
+    @apply px-4 py-3;
+  }
+
+  .kpi + .kpi {
+    border-left: 1px solid var(--color-line);
+  }
+
+  .kpi-label {
+    @apply text-[11px] tracking-wide text-faint uppercase;
+  }
+
+  .kpi-value {
+    @apply mt-1.5 font-mono text-[22px] leading-tight font-medium tracking-tight tabular-nums;
+  }
+
+  /* ---------- pills: pale tint, ink of the same hue ---------- */
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap;
+  }
+
+  .pill-neutral {
+    @apply bg-panel-2 text-mist;
+  }
+
+  .pill-pos {
+    @apply bg-pos/10 text-pos;
+  }
+
+  .pill-neg {
+    @apply bg-neg/10 text-neg;
+  }
+
+  .pill-warn {
+    @apply bg-warn/10 text-warn;
+  }
+
+  .pill-muted {
+    @apply bg-panel-2 text-faint;
+  }
+
+  /* ---------- tables ---------- */
+  .table-wrap {
+    @apply overflow-x-auto;
+  }
+
+  .ledger-table {
+    @apply w-full border-collapse text-[13px] tabular-nums;
+  }
+
+  .ledger-table th {
+    @apply h-9 border-b border-line px-3 text-left text-[11px] font-normal tracking-wide whitespace-nowrap text-faint uppercase;
+  }
+
+  .ledger-table td {
+    @apply border-b border-line/60 px-3 py-2.5 align-baseline;
+  }
+
+  .ledger-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  .ledger-table td.num,
+  .ledger-table th.num {
+    @apply text-right;
+  }
+
+  /* ---------- data bars ---------- */
+  .bar {
+    @apply h-1.5 overflow-hidden rounded-full bg-panel-2;
+  }
+
+  .bar > span {
+    @apply block h-full rounded-full bg-accent;
+  }
+
+  .bar-warn > span {
+    @apply bg-warn;
+  }
+
+  /* ---------- states ---------- */
+  .empty {
+    @apply grid min-h-24 place-items-center rounded-md border border-dashed border-line px-4 py-8 text-center text-sm text-mist;
   }
 
   .num {
     @apply font-mono tabular-nums;
+  }
+}
+
+@media (max-width: 640px) {
+  .kpi-strip {
+    grid-auto-flow: row;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .kpi:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .kpi:nth-child(n + 3) {
+    border-top: 1px solid var(--color-line);
+  }
+
+  .kpi:nth-child(2n) {
+    border-left: 1px solid var(--color-line);
   }
 }

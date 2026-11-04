@@ -7,6 +7,10 @@
  * failing at runtime with `undefined`.
  */
 
+export type MatchType = "exact" | "prefix" | "contains";
+export type MatchField = "merchant" | "raw";
+export type RuleOrigin = "user" | "seed";
+
 export interface Account {
   id: number;
   name: string;
@@ -27,6 +31,8 @@ export interface Meta {
   accounts: Account[];
   categories: Category[];
   transaction_count: number;
+  unknown_count: number;
+  rule_count: number;
   first_transaction_on: string | null;
   last_transaction_on: string | null;
 }
@@ -43,6 +49,7 @@ export interface Transaction {
   category: string | null;
   category_id: number | null;
   category_source: string;
+  confidence: number | null;
   is_transfer: boolean;
   account: string;
   account_id: number;
@@ -100,6 +107,86 @@ export interface SeedResult {
   end: string | null;
 }
 
+export interface Rule {
+  id: number;
+  pattern: string;
+  match_type: MatchType;
+  field: MatchField;
+  category: string | null;
+  category_id: number | null;
+  priority: number;
+  confidence: number;
+  origin: string;
+  is_transfer: boolean;
+  is_active: boolean;
+  applied_count: number;
+}
+
+export interface RuleMutation {
+  rule: Rule;
+  applied: number;
+  remaining: number;
+}
+
+export interface RulePreview {
+  matched: number;
+  uncategorised: number;
+  sample: { merchant: string; amount_minor: number; amount: string }[];
+}
+
+export interface RuleInput {
+  pattern: string;
+  category_id: number | null;
+  match_type?: MatchType;
+  field?: MatchField;
+  priority?: number;
+  is_transfer?: boolean;
+}
+
+export interface ReviewGroup {
+  merchant: string;
+  count: number;
+  total_minor: number;
+  total: string;
+  first_on: string;
+  last_on: string;
+  sample_raw: string;
+}
+
+export interface Review {
+  total_unknown: number;
+  groups: ReviewGroup[];
+}
+
+export interface AssignResult {
+  updated: number;
+  propagated: number;
+  learned: boolean;
+  category: string | null;
+}
+
+export interface CategoriseRun {
+  applied: number;
+  remaining: number;
+  by_source: Record<string, number>;
+}
+
+export interface CategorySlice {
+  category_id: number | null;
+  category: string;
+  spent_minor: number;
+  spent: string;
+  count: number;
+  share: number;
+}
+
+export interface Breakdown {
+  month: string | null;
+  total_spent_minor: number;
+  total_spent: string;
+  slices: CategorySlice[];
+}
+
 export interface TransactionQuery {
   month?: string;
   categoryId?: number;
@@ -122,7 +209,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new Error(message);
   }
+  // 204 has no body: returning undefined is correct for `void` calls.
+  if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
+}
+
+function jsonInit(method: string, body: unknown): RequestInit {
+  return {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  };
 }
 
 export function getMeta(): Promise<Meta> {
@@ -139,6 +236,69 @@ export function getTransactions(query: TransactionQuery): Promise<TransactionPag
   params.set("limit", String(query.limit ?? 50));
   params.set("offset", String(query.offset ?? 0));
   return request<TransactionPage>(`/api/transactions?${params.toString()}`);
+}
+
+export function getBreakdown(month: string | undefined, includeTransfers = false): Promise<Breakdown> {
+  const params = new URLSearchParams();
+  if (month) params.set("month", month);
+  if (includeTransfers) params.set("include_transfers", "true");
+  return request<Breakdown>(`/api/breakdown?${params.toString()}`);
+}
+
+export function getRules(): Promise<Rule[]> {
+  return request<Rule[]>("/api/rules");
+}
+
+export function createRule(input: RuleInput): Promise<RuleMutation> {
+  return request<RuleMutation>("/api/rules", jsonInit("POST", input));
+}
+
+export function updateRule(
+  id: number,
+  changes: Partial<Omit<RuleInput, "pattern">> & { pattern?: string; is_active?: boolean },
+): Promise<RuleMutation> {
+  return request<RuleMutation>(`/api/rules/${id}`, jsonInit("PATCH", changes));
+}
+
+export function deleteRule(id: number): Promise<void> {
+  return request<void>(`/api/rules/${id}`, { method: "DELETE" });
+}
+
+export function previewRule(
+  pattern: string,
+  matchType: MatchType,
+  field: MatchField,
+): Promise<RulePreview> {
+  return request<RulePreview>(
+    "/api/rules/preview",
+    jsonInit("POST", { pattern, match_type: matchType, field }),
+  );
+}
+
+export function runCategorisation(): Promise<CategoriseRun> {
+  return request<CategoriseRun>("/api/categorise/run", { method: "POST" });
+}
+
+export function getReview(): Promise<Review> {
+  return request<Review>("/api/review");
+}
+
+export function assignMerchant(merchant: string, categoryId: number): Promise<AssignResult> {
+  return request<AssignResult>(
+    "/api/review/assign",
+    jsonInit("POST", { merchant, category_id: categoryId, remember: true }),
+  );
+}
+
+export function setTransactionCategory(
+  transactionId: number,
+  categoryId: number | null,
+  remember = true,
+): Promise<AssignResult> {
+  return request<AssignResult>(
+    `/api/transactions/${transactionId}/category`,
+    jsonInit("POST", { category_id: categoryId, remember }),
+  );
 }
 
 export function seedDemo(months = 18): Promise<SeedResult> {

@@ -106,6 +106,76 @@ class ImportBatch(Base):
     )
 
 
+class CategoryRule(Base):
+    """A pattern that assigns a category, a transfer flag, or both.
+
+    ``origin`` separates rules the user wrote from rules the app ships, because
+    they rank differently: a user rule outranks learned memory, a seed rule does
+    not. ``priority`` only orders rules *within* a layer.
+    """
+
+    __tablename__ = "category_rules"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "origin", "pattern", "match_type", "field",
+            name="uq_category_rules_user_identity",
+        ),
+        Index("ix_category_rules_user_active", "user_id", "is_active"),
+        Index("ix_category_rules_category_id", "category_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    pattern: Mapped[str] = mapped_column(String(120), nullable=False)
+    match_type: Mapped[str] = mapped_column(String(16), nullable=False, default="contains")
+    field: Mapped[str] = mapped_column(String(16), nullable=False, default="merchant")
+    category_id: Mapped[int | None] = mapped_column(
+        ForeignKey("categories.id", ondelete="CASCADE"), nullable=True
+    )
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.9)
+    origin: Mapped[str] = mapped_column(String(16), nullable=False, default="user")
+    is_transfer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    category: Mapped[Category | None] = relationship(lazy="joined")
+
+
+class MerchantMemory(Base):
+    """What the user has explicitly chosen for one merchant.
+
+    One row per ``(user, merchant)``: a correction is evidence, so repeated
+    confirmations increment ``hits`` rather than appending rows. Confidence is
+    derived from ``hits`` in the domain, never stored.
+    """
+
+    __tablename__ = "merchant_memory"
+    __table_args__ = (
+        UniqueConstraint("user_id", "merchant_norm", name="uq_merchant_memory_user_merchant"),
+        Index("ix_merchant_memory_category_id", "category_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    merchant_norm: Mapped[str] = mapped_column(String(160), nullable=False)
+    category_id: Mapped[int] = mapped_column(
+        ForeignKey("categories.id", ondelete="CASCADE"), nullable=False
+    )
+    hits: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    last_confirmed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    category: Mapped[Category] = relationship(lazy="joined")
+
+
 class Transaction(Base):
     """One posted movement of money. Sign convention: inflow positive."""
 
@@ -115,6 +185,8 @@ class Transaction(Base):
         Index("ix_transactions_user_posted", "user_id", "posted_on"),
         Index("ix_transactions_user_merchant", "user_id", "merchant_norm"),
         Index("ix_transactions_user_category", "user_id", "category_id"),
+        Index("ix_transactions_user_source", "user_id", "category_source"),
+        Index("ix_transactions_category_rule_id", "category_rule_id"),
         Index("ix_transactions_import_batch_id", "import_batch_id"),
     )
 
@@ -134,7 +206,13 @@ class Transaction(Base):
     category_id: Mapped[int | None] = mapped_column(
         ForeignKey("categories.id", ondelete="SET NULL"), nullable=True
     )
+    # Provenance: which layer of the precedence order decided this row, and for
+    # rule decisions, which rule. Explainability is a stored fact, not a guess
+    # made later by re-running the engine against changed rules.
     category_source: Mapped[str] = mapped_column(String(16), nullable=False, default="unknown")
+    category_rule_id: Mapped[int | None] = mapped_column(
+        ForeignKey("category_rules.id", ondelete="SET NULL"), nullable=True
+    )
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     is_transfer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     dedupe_key: Mapped[str] = mapped_column(String(64), nullable=False)

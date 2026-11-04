@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db.models import User
 from app.db.session import get_session
+from app.services import categorisation_service
 
 LOCAL_USER_EMAIL = "local@spendwise.app"
 
@@ -39,7 +40,12 @@ def get_current_user(session: SessionDep) -> User:
         timezone=settings.timezone,
     )
     session.add(user)
-    session.commit()
+    session.flush()
+    # A new account gets the system taxonomy and the built-in rules immediately,
+    # so the very first import is categorised instead of arriving unlabelled.
+    # Deliberately *only* at creation: re-adding deleted seed rules on every
+    # request would make deleting one impossible.
+    categorisation_service.ensure_seed_rules(session, user)
     session.refresh(user)
     return user
 

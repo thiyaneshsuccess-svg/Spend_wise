@@ -12,10 +12,12 @@ from __future__ import annotations
 import argparse
 from datetime import date
 
-from sqlalchemy import inspect
+from sqlalchemy import inspect, select
 from sqlalchemy.exc import OperationalError
 
+from app.db.models import User
 from app.db.session import SessionLocal, engine
+from app.services.categorisation_service import ensure_seed_rules
 from app.services.demo_data import seed_demo_data
 
 
@@ -45,16 +47,21 @@ def main() -> None:
                 end=args.end,
                 currency=args.currency,
             )
+            user = session.scalar(select(User).order_by(User.id))
+            rules = ensure_seed_rules(session, user) if user is not None else 0
     except OperationalError as exc:
         print(f"Database error: {exc}")
         raise SystemExit(1) from exc
 
     if result.skipped:
-        print(f"Ledger already has data ({result.start} to {result.end}); nothing inserted.")
+        print(
+            f"Ledger already has data ({result.start} to {result.end}); nothing inserted. "
+            f"Added {rules} missing seed rules."
+        )
         return
     # ASCII only: the Windows console defaults to cp1252 and chokes on arrows.
     print(f"Seeded {result.created} transactions over {args.months} months "
-          f"({result.start} to {result.end}).")
+          f"({result.start} to {result.end}) and {rules} seed rules.")
 
 
 if __name__ == "__main__":

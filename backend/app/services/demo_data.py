@@ -22,26 +22,20 @@ from datetime import date, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Account, Category, Transaction, User
-from app.domain.enums import AccountKind, CategoryKind, CategorySource
+from app.db.models import Account, Transaction, User
+from app.domain.enums import AccountKind, CategorySource
 from app.domain.period import MonthPeriod
+from app.services.taxonomy import TRANSFER_CATEGORY, ensure_categories
 
-SYSTEM_CATEGORIES: tuple[tuple[str, CategoryKind], ...] = (
-    ("Salary", CategoryKind.INCOME),
-    ("Interest", CategoryKind.INCOME),
-    ("Rent", CategoryKind.EXPENSE),
-    ("Groceries", CategoryKind.EXPENSE),
-    ("Dining", CategoryKind.EXPENSE),
-    ("Transport", CategoryKind.EXPENSE),
-    ("Utilities", CategoryKind.EXPENSE),
-    ("Subscriptions", CategoryKind.EXPENSE),
-    ("Shopping", CategoryKind.EXPENSE),
-    ("Health", CategoryKind.EXPENSE),
-    ("Education", CategoryKind.EXPENSE),
-    ("Investments", CategoryKind.EXPENSE),
-    ("Insurance", CategoryKind.EXPENSE),
-    ("Fees", CategoryKind.EXPENSE),
-    ("Transfers", CategoryKind.TRANSFER),
+#: A row the demo deliberately leaves uncategorised (empty category name).
+UNCATEGORISED = ""
+
+#: Merchants that appear only in the last few months and that no default rule
+#: knows — the work the review queue exists for.
+UNKNOWN_TAIL: tuple[tuple[str, int, int], ...] = (
+    ("BOOKMYSHOW", 350, 1_100),
+    ("METRO CARD RECHARGE", 200, 500),
+    ("URBAN CLAP", 600, 2_400),
 )
 
 DEMO_ACCOUNTS: tuple[tuple[str, AccountKind, str | None, int], ...] = (
@@ -105,23 +99,7 @@ def _ensure_user(session: Session, currency: str) -> User:
 
 def _ensure_taxonomy(session: Session, user: User) -> dict[str, dict[str, int]]:
     """Create system categories and demo accounts. Returns name → [ids]."""
-    existing_categories = {
-        c.name: c for c in session.scalars(select(Category).where(Category.user_id == user.id))
-    }
-    categories: dict[str, int] = {}
-    for order, (name, kind) in enumerate(SYSTEM_CATEGORIES):
-        category = existing_categories.get(name)
-        if category is None:
-            category = Category(
-                user_id=user.id,
-                name=name,
-                kind=kind.value,
-                is_system=True,
-                sort_order=order,
-            )
-            session.add(category)
-            session.flush()
-        categories[name] = category.id
+    categories = ensure_categories(session, user)
 
     existing_accounts = {
         a.name for a in session.scalars(select(Account).where(Account.user_id == user.id))
@@ -298,6 +276,27 @@ def build_rows(
             for _ in range(2):
                 add(day, -240_00, "UPI/CCD COFFEE/991122/Payment", "CCD COFFEE", "Dining")
 
+        # --- a realistic unknown tail --------------------------------------
+        # Real ledgers always contain a handful of merchants nothing knows yet.
+        # Without them the review queue would be permanently empty, and the most
+        # interesting screen in the product could never be exercised by hand.
+        if index >= months - 3:
+            add(
+                _day_in_month(period, rng.randint(6, 26)),
+                -_rupees(240, 620, rng),
+                f"UPI/BLUE TOKAI COFFEE/{_ref(rng)}/Payment",
+                "BLUE TOKAI COFFEE",
+                UNCATEGORISED,
+            )
+            name, low, high = rng.choice(UNKNOWN_TAIL)
+            add(
+                _day_in_month(period, rng.randint(3, 27)),
+                -_rupees(low, high, rng),
+                f"UPI/{name}/{_ref(rng)}/Payment",
+                name,
+                UNCATEGORISED,
+            )
+
     rows.sort(key=lambda row: row[0])
     return rows
 
@@ -333,6 +332,9 @@ def seed_demo_data(
 
     rows = build_rows(months=months, seed=seed, end=end)
     for position, (posted_on, amount, raw, norm, category, account) in enumerate(rows):
+        # An empty category name is the deliberate "nothing knows this merchant"
+        # case: it lands exactly where an imported row would, as ``unknown``.
+        category_id = taxonomy["categories"].get(category) if category else None
         session.add(
             Transaction(
                 user_id=user.id,
@@ -343,10 +345,12 @@ def seed_demo_data(
                 merchant_raw=raw,
                 merchant_norm=norm,
                 description=raw,
-                category_id=taxonomy["categories"][category],
-                category_source=CategorySource.SEED.value,
-                confidence=1.0,
-                is_transfer=category == "Transfers",
+                category_id=category_id,
+                category_source=(
+                    CategorySource.SEED.value if category_id else CategorySource.UNKNOWN.value
+                ),
+                confidence=1.0 if category_id else None,
+                is_transfer=category == TRANSFER_CATEGORY,
                 dedupe_key=hashlib.sha256(f"demo|{seed}|{position}".encode()).hexdigest(),
                 occurrence_index=0,
             )

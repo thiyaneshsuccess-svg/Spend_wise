@@ -19,12 +19,13 @@ transaction list API + table UI with filters.
 **Learning:** normalisation, idempotency, integer money, deterministic data generation, migration
 discipline.
 
-## M2 — Categorisation
+## M2 — Categorisation *(done)*
 Rule engine + learned merchant memory + seed rules + provenance fields; review queue for
-uncategorised transactions; rules management UI.
+uncategorised transactions (grouped by merchant); rules management UI with live preview;
+inline category edit + propagation; category spend breakdown.
 **Done when:** every demo transaction has a category or an explicit `unknown`; overrides retrain
 merchant memory; rule precedence is covered by tests.
-**Learning:** precedence design, confidence as data, why "unknown" beats a wrong default.
+**Learning:** precedence design, confidence as data, why "unknown" beats a wrong default; explainability over blind auto-categorisation.
 
 ## M3 — Pulse
 Monthly aggregates, robust baselines (median), merchant-level variance attribution, reconciliation
